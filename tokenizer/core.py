@@ -3,7 +3,8 @@ import collections
 class Tokenizer:
     def __init__(self):
         self.symbols = [] #list of all the characters
-        self.tokens = [] #list of the tuples representing tokens
+        self.merges = {} #maps what merges into what
+        self.token_to_string = {} #maps a token back to the string it represents
 
     def train(self, corpus: list[str], num_merges: int) -> None:
         """
@@ -16,25 +17,34 @@ class Tokenizer:
         #repeat num_merges times
 
         #counts the number of unique characters, and replaces every sentence with a list of characters (represented as their index in the list of vocab)
+        modified_corpus = []
         for sentence in corpus:
             new_sentence = []
             for char in sentence:
                 if char not in self.symbols:
                     self.symbols.append(char)
                 new_sentence.append(self.symbols.index(char))
-            sentence = new_sentence
+            modified_corpus.append(new_sentence)
+        corpus = modified_corpus
 
         initial_symbols = len(self.symbols)
 
-        self.tokens.append(i for i in range(initial_symbols))
+        #maps out the initial symbols
+        for i, char in enumerate(self.symbols):
+            self.token_to_string[i] = char
 
         #merge everything num_merges times
         for i in range(num_merges):
             count = self._pair_counter(corpus)
             most_frequent = max(count, key=count.get)
+
+            print(f"Merge {i+1}/{num_merges} | Merging pair: {most_frequent} (Frequency: {count[most_frequent]})")
+
             new_token = initial_symbols + i
 
-            self.tokens.append(new_token)
+            self.merges[most_frequent] = new_token
+
+            self.token_to_string[new_token] = self.token_to_string[most_frequent[0]] + self.token_to_string[most_frequent[1]]
 
             corpus = self._merge_best(corpus, most_frequent, new_token)
 
@@ -54,6 +64,7 @@ class Tokenizer:
         """
         goes through the corpus and merges all instances of the most frequent pair into their new pair
         """
+        modified_corpus = []
         for sentence in corpus:
             new_sentence = []
             i = 0
@@ -65,16 +76,41 @@ class Tokenizer:
                 else:
                     new_sentence.append(sentence[i])
                     i += 1
-            sentence = new_sentence
-        return corpus
+            modified_corpus.append(new_sentence)
+        return modified_corpus
 
 
-    def encode(self, text: str) -> list[str]:
+    def encode(self, text: str) -> list[int]:
         """
         Takes a given string of text and tokenizes it
         """
+        #uses the list of symbols to map each symbol in the string to its token, and skips it if its a new symbol.
+        tokens = [self.symbols.index(char) for char in text if char in self.symbols]
 
-    def decode(self, tokens: list[str]) -> str:
+        #merge tokens while there are tokens left to merge
+        while len(tokens) >= 2:
+            pairs = self._pair_counter([tokens])
+            best_pair = None
+            lowest_token_id = 10000000000000000 #really big number
+            for pair in pairs.keys():
+                if pair in self.merges:
+                    token_id = self.merges[pair]
+
+                    if token_id < lowest_token_id:
+                        lowest_token_id = token_id
+                        best_pair = pair
+
+            if best_pair is None:
+                break            
+
+            tokens = self._merge_best([tokens], best_pair, self.merges[best_pair])[0]
+
+        return tokens
+
+
+
+    def decode(self, tokens: list[int]) -> str:
         """
         Takes a list of tokens and reassembles it back into a string
         """
+        return "".join(self.token_to_string.get(t) for t in tokens)
