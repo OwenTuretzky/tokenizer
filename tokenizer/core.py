@@ -2,9 +2,9 @@ import collections
 
 class Tokenizer:
     def __init__(self):
-        self.symbols = [] #list of all the characters
+        self.symbols = ["[UNKNOWN]"] #list of all the characters
         self.merges = {} #maps what merges into what
-        self.token_to_string = {} #maps a token back to the string it represents
+        self.token_to_string = {0: "[UNKNOWN]"} #maps a token back to the string it represents
 
     def train(self, corpus: list[str], num_merges: int) -> None:
         """
@@ -85,7 +85,12 @@ class Tokenizer:
         Takes a given string of text and tokenizes it
         """
         #uses the list of symbols to map each symbol in the string to its token, and skips it if its a new symbol.
-        tokens = [self.symbols.index(char) for char in text if char in self.symbols]
+        tokens = []
+        for char in text:
+            if char in self.symbols:
+                tokens.append(self.symbols.index(char))
+            else:
+                tokens.append(0) #if it gets here, there must be an unknown character
 
         #merge tokens while there are tokens left to merge
         while len(tokens) >= 2:
