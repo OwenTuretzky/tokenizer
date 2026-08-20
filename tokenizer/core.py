@@ -1,31 +1,36 @@
+"""
+A BPE tokenizer based off Sennrich's paper and SentencePiece. Takes some corpus and creates a list of tokens based on the most common pairs of characters in that corpus.
+"""
+
 import collections
 
 class Tokenizer:
     def __init__(self):
-        self.symbols = ["[UNKNOWN]"] #list of all the characters
-        self.merges = {} #maps what merges into what
+        self.symbols = ["[UNKNOWN]"]            #list of all the characters
+        self.merges = {}                        #maps what has been merged together
         self.token_to_string = {0: "[UNKNOWN]"} #maps a token back to the string it represents
 
     def train(self, corpus: list[str], num_merges: int) -> None:
         """
-        Using the algorithm in Sennrich's paper and modifications in the SentencePiece paper, perform BPE on each sentence in the corpus until len(tokens) = num_merges + len(symbols)
+        Using the algorithm in Sennrich's paper and modifications in the SentencePiece paper, perform BPE on each sentence in the corpus.
         """
-        #get a list of every character, add them all as tokens
-        #look through each sentence in the data and count the pairs of characters
-        #take the most common pair and create a tuple, add it to the end of tokens
-        #go back and replace all the smaller tokens in the training data with the new token
-        #repeat num_merges times
 
-        #counts the number of unique characters, and replaces every sentence with a list of characters (represented as their index in the list of vocab)
-        modified_corpus = []
+        #stores each sequence in the corpus in a dict, allowing duplicate sequences to be counted instead of both stored.
+        corpus_dict = collections.defaultdict(int)
+
+        #dictionary storing characters to make lookups faster
+        symbols_to_id= {char: id for id, char in enumerate(self.symbols)}
+
+        #loads each character and sentence
         for sentence in corpus:
             new_sentence = []
             for char in sentence:
-                if char not in self.symbols:
+                if char not in symbols_to_id:
+                    symbols_to_id[char] = len(self.symbols)
                     self.symbols.append(char)
-                new_sentence.append(self.symbols.index(char))
-            modified_corpus.append(new_sentence)
-        corpus = modified_corpus
+                new_sentence.append(symbols_to_id[char])
+            key = tuple(new_sentence)
+            corpus_dict[key] += 1
 
         initial_symbols = len(self.symbols)
 
@@ -35,10 +40,8 @@ class Tokenizer:
 
         #merge everything num_merges times
         for i in range(num_merges):
-            count = self._pair_counter(corpus)
+            count = self._pair_counter(corpus_dict)
             most_frequent = max(count, key=count.get)
-
-            print(f"Merge {i+1}/{num_merges} | Merging pair: {most_frequent} (Frequency: {count[most_frequent]})")
 
             new_token = initial_symbols + i
 
@@ -46,37 +49,35 @@ class Tokenizer:
 
             self.token_to_string[new_token] = self.token_to_string[most_frequent[0]] + self.token_to_string[most_frequent[1]]
 
-            corpus = self._merge_best(corpus, most_frequent, new_token)
+            corpus_dict = self._merge_best(corpus_dict, most_frequent, new_token)
 
-    def _pair_counter(self, corpus: list[list[int]]) -> dict[tuple[int,int], int] :
+    def _pair_counter(self, corpus: dict[tuple[int, ...], int]) -> dict[tuple[int,int], int] :
         """
         A helper function to get the number of times each pair of tokens appears.
-        Takes the corpus as a list of ints instead of strings or characters, and returns a mapping of tuples to the number of times they appear.
         """
         pairs = collections.defaultdict(int)
-        for sentence in corpus:
-            for i in range(len(sentence) - 1):
-                pair = (sentence[i], sentence[i+1])
-                pairs[pair] += 1
+        for sequence, count in corpus.items():
+            for i in range(len(sequence) - 1):
+                pairs[(sequence[i], sequence[i+1])] += count
         return pairs
 
-    def _merge_best(self, corpus: list[list[int]], most_frequent: tuple[int, int], new_token: int) -> list[list[int]]:
+    def _merge_best(self, corpus: dict[tuple[int, ...], int], most_frequent: tuple[int, int], new_token: int) -> dict[tuple[int, ...], int]:
         """
-        goes through the corpus and merges all instances of the most frequent pair into their new pair
+        goes through the corpus and merges all instances of the most frequent pair into a new token
         """
-        modified_corpus = []
-        for sentence in corpus:
-            new_sentence = []
+        modified_corpus = collections.defaultdict(int)
+        for sequence, count in corpus.items():
+            new_sequence = []
             i = 0
-            while i < len(sentence):
-                #if the pair is in this sentence, replace the two tokens with the new one. otherwise, just copy the old token.
-                if i < len(sentence) -1 and sentence[i] == most_frequent[0] and sentence[i+1] == most_frequent[1]:
-                    new_sentence.append(new_token)
+            while i < len(sequence):
+                #if the pair is in this sequence, replace the two tokens with the new one. otherwise, just copy the old token.
+                if i < len(sequence) -1 and sequence[i] == most_frequent[0] and sequence[i+1] == most_frequent[1]:
+                    new_sequence.append(new_token)
                     i += 2
                 else:
-                    new_sentence.append(sentence[i])
+                    new_sequence.append(sequence[i])
                     i += 1
-            modified_corpus.append(new_sentence)
+            modified_corpus[tuple(new_sequence)] += count
         return modified_corpus
 
 
@@ -94,7 +95,9 @@ class Tokenizer:
 
         #merge tokens while there are tokens left to merge
         while len(tokens) >= 2:
-            pairs = self._pair_counter([tokens])
+            pairs = collections.defaultdict(int)
+            for i in range(len(tokens) - 1):
+                pairs[(tokens[i], tokens[i+1])] += 1
             best_pair = None
             lowest_token_id = 10000000000000000 #really big number
             for pair in pairs.keys():
@@ -108,7 +111,16 @@ class Tokenizer:
             if best_pair is None:
                 break            
 
-            tokens = self._merge_best([tokens], best_pair, self.merges[best_pair])[0]
+            i = 0
+            new_tokens = []
+            while i < len(tokens):
+                if i < len(tokens) - 1 and (tokens[i], tokens[i+1]) == best_pair:
+                    new_tokens.append(self.merges[best_pair])
+                    i += 2
+                else:
+                    new_tokens.append(tokens[i])
+                    i += 1
+            tokens = new_tokens
 
         return tokens
 
@@ -118,4 +130,4 @@ class Tokenizer:
         """
         Takes a list of tokens and reassembles it back into a string
         """
-        return "".join(self.token_to_string.get(t) for t in tokens)
+        return "".join(self.token_to_string.get(t, "[UNKNOWN]") for t in tokens)
