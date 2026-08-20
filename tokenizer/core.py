@@ -131,3 +131,36 @@ class Tokenizer:
         Takes a list of tokens and reassembles it back into a string
         """
         return "".join(self.token_to_string.get(t, "[UNKNOWN]") for t in tokens)
+
+    
+    #CODE BELOW HERE WAS WRITTEN BY LLMS
+
+    def save(self, path: str) -> None:
+        """
+        THIS FUNCTION WAS WRITTEN FOR ME BY AN LLM
+        saves the relavent lists and dicts, so you dont have to train every time.
+        """
+        import json
+        data = {
+            "symbols": self.symbols,
+            "merges": {f"{a},{b}": c for (a, b), c in self.merges.items()},
+            "token_to_string": {str(token): string for token, string in self.token_to_string.items()}
+        }
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False)
+
+    def load(self, path: str) -> None:
+        """
+        THIS FUNCTION WAS WRITTEN FOR ME BY AN LLM
+        loads the relavent lists and dicts, so you dont have to train every time.
+        """
+        import json
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        self.symbols = data["symbols"]
+        self.merges = {
+            (int(a), int(b)): c
+            for key, c in data["merges"].items()
+            for a, b in [key.split(",")]
+        }
+        self.token_to_string = {int(token): string for token, string in data["token_to_string"].items()}
