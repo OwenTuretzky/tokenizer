@@ -6,9 +6,9 @@ import collections
 
 class Tokenizer:
     def __init__(self):
-        self.symbols = ["[UNKNOWN]"]            #list of all the characters
+        self.symbols = ["[UNKNOWN]", "[BOS]", "[EOS]", "[PAD]"]            #list of all the characters
         self.merges = {}                        #maps what has been merged together
-        self.token_to_string = {0: "[UNKNOWN]"} #maps a token back to the string it represents
+        self.token_to_string = {0: "[UNKNOWN]",1: "[BOS]",2: "[EOS]",3: "[PAD]"} #maps a token back to the string it represents
 
     def train(self, corpus: list[str], num_merges: int) -> None:
         """
@@ -44,6 +44,8 @@ class Tokenizer:
             most_frequent = max(count, key=count.get)
 
             new_token = initial_symbols + i
+
+            print(f"Merge {i+1}/{num_merges} | Merging pair: {most_frequent} (Frequency: {count[most_frequent]})")
 
             self.merges[most_frequent] = new_token
 

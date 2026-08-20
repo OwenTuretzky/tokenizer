@@ -1,11 +1,13 @@
 # Custom Tokenizer
 A custom from-scratch tokenizer meant to work for both Japanese and English. Written as a starting point for my larger translation project, but works by itself as well.
 
-Implements Byte-Pair Encoding without any whitespace segmentation, allowing it to handle both japanese and english effectively.
+Implements Byte-Pair Encoding without any whitespace segmentation, allowing it to handle both Japanese and English effectively.
 
 ## Usage
-Install the package
+Clone the repo and install the package:
 ```bash
+git clone https://github.com/OwenTuretzky/tokenizer.git
+cd tokenizer
 pip install -e .
 ```
 Train on some corpus (I tested with [small_parallel_enja](https://github.com/odashi/small_parallel_enja/tree/master), but any list of strings will work)
@@ -13,8 +15,10 @@ Train on some corpus (I tested with [small_parallel_enja](https://github.com/oda
 ```python
 from tokenizer import Tokenizer
 
+corpus = ["This is a test sentence."]
+
 t = Tokenizer()
-t.train(corpus, num_merges=1000)
+t.train(corpus, num_merges=100)
 t.save("vocab.json")
 ```
 You can also save and load and use it to encode/decode text:
@@ -23,11 +27,11 @@ t = Tokenizer()
 t.load("vocab.json")
 
 tokens = t.encode("this is a test sentence.")
-print(tokens)           # [4747, 7427, ...]
+print(tokens)           # [47, 12, 6, ...]
 print(t.decode(tokens)) # this is a test sentence.
 ```
 
-Unknown characters are mapped as a special token 0 "[UNKNOWN]"
+Unknown characters are mapped as a special token 0 "[UNKNOWN]", and special characters are used at the begining and end of sentences.
 
 
 ## LLM Use
